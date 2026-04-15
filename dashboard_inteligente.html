@@ -40,19 +40,6 @@ canvas{background:white;border-radius:10px;margin-top:20px;}
 <canvas id="supChart"></canvas>
 <canvas id="trendChart"></canvas>
 <canvas id="variacion"></canvas>
-function generarAlertas(){
-    let ul=document.getElementById("alertas");
-    ul.innerHTML="";
-
-    asesores.forEach(a=>{
-        if(a.v < 20){
-            ul.innerHTML += `<li class="red">🚨 ${a.n} (CRÍTICO)</li>`;
-        } 
-        else if(a.v < 40){
-            ul.innerHTML += `<li class="yellow">⚠️ ${a.n} (BAJO)</li>`;
-        }
-    });
-}
 
 
 <h2>📋 Ranking</h2>
@@ -106,8 +93,6 @@ tbody.innerHTML+=`<tr>
 </tr>`;
 });
 
-generarAlertas();
-}
 
 function generarAlertas(){
 let ul=document.getElementById("alertas");
@@ -181,17 +166,27 @@ graficos();
         }));
 
 cargarTabla();
-analisisGerencial();
+generarAlertas();
+graficoVariacion();
     };
 
     reader.readAsArrayBuffer(file);
 });
+function generarAlertas(){
+    let ul=document.getElementById("alertas");
+    ul.innerHTML="";
 
-</script>
+    asesores.forEach(a=>{
+        if(a.v < 20){
+            ul.innerHTML += `<li class="red">🚨 ${a.n} (CRÍTICO)</li>`;
+        } 
+        else if(a.v < 40){
+            ul.innerHTML += `<li class="yellow">⚠️ ${a.n} (BAJO)</li>`;
+        }
+    });
+}
 
-</body>
-</html>
-function analisisGerencial(){
+function graficoVariacion(){
 
     let resumen = {};
 
@@ -203,30 +198,23 @@ function analisisGerencial(){
         resumen[a.s].count += 1;
     });
 
-    let alertas = document.getElementById("alertas");
-    alertas.innerHTML = "";
+    let labels = Object.keys(resumen);
+    let valores = labels.map(s=> 
+        Math.round(resumen[s].total / resumen[s].count)
+    );
 
-    for(let sup in resumen){
-        let prom = resumen[sup].total / resumen[sup].count;
-
-        if(prom < 30){
-            alertas.innerHTML += `<li class="red">🔴 ${sup} en estado CRÍTICO</li>`;
-        } 
-        else if(prom < 45){
-            alertas.innerHTML += `<li class="yellow">🟡 ${sup} en riesgo</li>`;
-        } 
-        else {
-            alertas.innerHTML += `<li class="green">🟢 ${sup} estable</li>`;
+    new Chart(document.getElementById('variacion'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Promedio por Supervisor',
+                data: valores
+            }]
         }
-    }
+    });
 }
-          new Chart(document.getElementById('variacion'),{
-    type:'bar',
-    data:{
-        labels:Object.keys(resumen),
-        datasets:[{
-            label:'Promedio por Supervisor',
-            data:Object.values(resumen).map(x=>Math.round(x.total/x.count))
-        }]
-    }
-});
+</script>
+
+</body>
+</html>
