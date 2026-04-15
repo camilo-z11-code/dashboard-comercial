@@ -75,6 +75,12 @@ button{background:#1e293b;color:white;cursor:pointer}
 
 let dataGlobal=[];
 
+// ==================== UTIL ====================
+function numeroSeguro(valor){
+    if(valor===null||valor===undefined||valor==="") return 0;
+    return Number(valor.toString().replace(",", "").trim())||0;
+}
+
 // ==================== CARGA ====================
 document.getElementById('fileInput').addEventListener('change', function(e){
 
@@ -91,8 +97,8 @@ let json=XLSX.utils.sheet_to_json(hoja);
 
 dataGlobal=json.map(f=>{
 
-let marzo=parseInt(f.Marzo||f.MARZO||0);
-let abril=parseInt(f.Abril||f.ABRIL||0);
+let marzo=numeroSeguro(f.Marzo||f.MARZO);
+let abril=numeroSeguro(f.Abril||f.ABRIL);
 
 let varr=abril-marzo;
 let porc=marzo>0?(varr/marzo)*100:0;
@@ -166,7 +172,7 @@ tbody.innerHTML+=`<tr>
 
 }
 
-// ==================== ANTIGUEDAD PROYECTADA ====================
+// ==================== ANTIGUEDAD + ALERTA ====================
 function antiguedad(data){
 
 let hoy=new Date();
@@ -181,9 +187,18 @@ if(!a.fecha)return;
 
 let fecha;
 
+// Excel número
 if(typeof a.fecha==="number"){
 fecha=new Date((a.fecha-25569)*86400*1000);
-}else{
+}
+
+// dd/mm/yyyy
+else if(typeof a.fecha==="string" && a.fecha.includes("/")){
+let p=a.fecha.split("/");
+fecha=new Date(p[2],p[1]-1,p[0]);
+}
+
+else{
 fecha=new Date(a.fecha);
 }
 
@@ -191,19 +206,32 @@ if(isNaN(fecha))return;
 
 let meses=(hoy-fecha)/(1000*60*60*24*30);
 
-// 🔥 PROYECCIÓN ABRIL
 let proy=(a.abril/dia)*diasMes;
 
-let obj={...a,proy:proy};
+let obj={...a,proy};
 
 if(meses<=3)nuevos.push(obj);
 else antiguos.push(obj);
 
 });
 
+// ================= ALERTAS ESTRUCTURA =================
+let ul=document.getElementById("alertas");
+
+// 🚨 SIN NUEVOS
+if(nuevos.length===0){
+ul.innerHTML+=`<li class="red">🚨 No hay asesores nuevos (0-3 meses)</li>`;
+}
+
+// ⚠️ ONBOARDING DÉBIL
 let pn=nuevos.length?nuevos.reduce((a,b)=>a+b.proy,0)/nuevos.length:0;
 let pa=antiguos.length?antiguos.reduce((a,b)=>a+b.proy,0)/antiguos.length:0;
 
+if(nuevos.length>0 && pn < pa*0.6){
+ul.innerHTML+=`<li class="yellow">⚠️ Onboarding débil: nuevos rinden mucho menos</li>`;
+}
+
+// KPIs
 document.getElementById("prodNuevos").innerText=Math.round(pn);
 document.getElementById("prodAntiguos").innerText=Math.round(pa);
 
@@ -238,15 +266,15 @@ type:'bar',
 data:{labels:labels,datasets:[{
 label:'Proyección Abril',
 data:labels.map(s=>{
-let diaria=res[s].abril/15;
-return Math.round(diaria*30);
+let d=res[s].abril/15;
+return Math.round(d*30);
 })
 }]}
 });
 
 }
 
-// ==================== ALERTAS ====================
+// ==================== ALERTAS BASE ====================
 function alertas(data){
 
 let ul=document.getElementById("alertas");
