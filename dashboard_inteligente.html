@@ -10,16 +10,36 @@
 <style>
 body{font-family:Arial;background:#0f172a;color:white;padding:20px}
 h1{text-align:center}
+
+/* KPIs */
 .container{display:grid;grid-template-columns:repeat(6,1fr);gap:15px;margin-bottom:20px}
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
+
+/* COLORES */
 .green{color:#22c55e}
 .yellow{color:#eab308}
 .red{color:#ef4444}
-canvas{background:white;border-radius:10px;margin-top:20px}
+
+/* 🔥 GRAFICAS MÁS PEQUEÑAS */
+.graficos{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+}
+
+canvas{
+background:white;
+border-radius:10px;
+height:250px !important;
+}
+
+/* TABLA */
 table{width:100%;margin-top:20px;border-collapse:collapse}
 th,td{padding:10px;text-align:center}
 th{background:#1e293b}
 tr:nth-child(even){background:#1e293b}
+
+/* FILTROS */
 select,button{padding:8px;border-radius:5px;margin:5px;border:none}
 button{background:#1e293b;color:white;cursor:pointer}
 </style>
@@ -51,8 +71,11 @@ button{background:#1e293b;color:white;cursor:pointer}
 <div class="card"><div>Prod Antiguos</div><div id="prodAntiguos"></div></div>
 </div>
 
+<!-- 🔥 GRAFICOS -->
+<div class="graficos">
 <canvas id="variacionSup"></canvas>
 <canvas id="proyeccionSup"></canvas>
+</div>
 
 <h2>🚨 Alertas</h2>
 <ul id="alertas"></ul>
@@ -75,22 +98,19 @@ button{background:#1e293b;color:white;cursor:pointer}
 
 let dataGlobal=[];
 
-// ================= UTIL =================
 function numeroSeguro(v){
     if(!v) return 0;
     return Number(v.toString().replace(",","").trim())||0;
 }
 
-// ================= CALENDARIO =================
+// ================= PROYECCIÓN =================
 function esFestivo(fecha){
     const festivos=["2026-01-01","2026-05-01","2026-07-20"];
     return festivos.includes(fecha.toISOString().split("T")[0]);
 }
 
 function diasLaborales(inicio,fin){
-    let d=0;
-    let f=new Date(inicio);
-
+    let d=0,f=new Date(inicio);
     while(f<=fin){
         if(f.getDay()!==0 && !esFestivo(f)) d++;
         f.setDate(f.getDate()+1);
@@ -99,17 +119,12 @@ function diasLaborales(inicio,fin){
 }
 
 function proyeccion(ventas){
-
     let hoy=new Date();
-
     let inicio=new Date(hoy.getFullYear(),hoy.getMonth(),1);
     let fin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0);
 
     let trabajados=diasLaborales(inicio,hoy);
-
-    let manana=new Date();
-    manana.setDate(hoy.getDate()+1);
-
+    let manana=new Date(); manana.setDate(hoy.getDate()+1);
     let restantes=diasLaborales(manana,fin);
 
     if(trabajados===0) return ventas;
@@ -180,26 +195,7 @@ document.getElementById("promedio").innerText=Math.round(tA/data.length);
 document.getElementById("estado").innerHTML=porc>=0?"<span class='green'>Crecimiento</span>":"<span class='red'>Caída</span>";
 }
 
-// ================= TABLA =================
-function tabla(data){
-
-let t=document.getElementById("tabla");
-t.innerHTML="";
-
-data.sort((a,b)=>b.abril-a.abril);
-
-data.forEach(a=>{
-t.innerHTML+=`<tr>
-<td>${a.n}</td>
-<td>${a.s}</td>
-<td>${a.marzo}</td>
-<td>${a.abril}</td>
-<td class="${a.porc<0?'red':'green'}">${a.porc.toFixed(1)}%</td>
-</tr>`;
-});
-}
-
-// ================= PRODUCTIVIDAD REAL =================
+// ================= PRODUCTIVIDAD (PROMEDIO) =================
 function antiguedad(data){
 
 let hoy=new Date();
@@ -214,7 +210,7 @@ let fecha;
 
 if(typeof a.fecha==="number"){
 fecha=new Date((a.fecha-25569)*86400*1000);
-}else if(typeof a.fecha==="string" && a.fecha.includes("/")){
+}else if(a.fecha.includes("/")){
 let p=a.fecha.split("/");
 fecha=new Date(p[2],p[1]-1,p[0]);
 }else{
@@ -239,29 +235,16 @@ let pa=antiguos.length?antiguos.reduce((a,b)=>a+b,0)/antiguos.length:0;
 document.getElementById("prodNuevos").innerText=Math.round(pn);
 document.getElementById("prodAntiguos").innerText=Math.round(pa);
 
-// ALERTAS ESTRUCTURA
-let ul=document.getElementById("alertas");
-
-if(nuevos.length===0){
-ul.innerHTML+=`<li class="red">🚨 No hay asesores nuevos</li>`;
 }
 
-if(nuevos.length>0 && pn < pa*0.7){
-ul.innerHTML+=`<li class="yellow">⚠️ Nuevos rinden por debajo</li>`;
-}
-
-}
-
-// ================= ALERTAS ORDENADAS =================
+// ================= ALERTAS =================
 function alertas(data){
 
 let ul=document.getElementById("alertas");
 
-// ORDENAR POR PEOR IMPACTO
 let ordenados=[...data].sort((a,b)=>a.porc-b.porc);
 
 ordenados.forEach(a=>{
-
 let diff=a.abril-a.marzo;
 
 if(a.porc < -20){
@@ -270,9 +253,7 @@ ul.innerHTML+=`<li class="red">🚨 ${a.n} (${a.porc.toFixed(1)}% | ${diff})</li
 else if(a.porc < 0){
 ul.innerHTML+=`<li class="yellow">⚠️ ${a.n} (${a.porc.toFixed(1)}% | ${diff})</li>`;
 }
-
 });
-
 }
 
 // ================= GRAFICOS =================
@@ -288,7 +269,6 @@ res[a.s].abril+=a.abril;
 
 let labels=Object.keys(res);
 
-// VARIACION
 new Chart(document.getElementById("variacionSup"),{
 type:'bar',
 data:{
@@ -303,18 +283,16 @@ return m>0?((a-m)/m)*100:0;
 }
 });
 
-// PROYECCION
 new Chart(document.getElementById("proyeccionSup"),{
 type:'bar',
 data:{
 labels:labels,
 datasets:[{
-label:"Proyección Real",
+label:"Proyección",
 data:labels.map(s=>proyeccion(res[s].abril))
 }]
 }
 });
-
 }
 
 // ================= FILTROS =================
