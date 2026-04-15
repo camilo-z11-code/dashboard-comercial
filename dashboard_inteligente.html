@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Power BI Comercial</title>
+<title>Dashboard Director Comercial</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -11,7 +11,7 @@
 body{font-family:Arial;background:#0f172a;color:white;padding:20px}
 h1{text-align:center}
 
-.container{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:20px}
+.container{display:grid;grid-template-columns:repeat(6,1fr);gap:15px;margin-bottom:20px}
 
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
 
@@ -26,19 +26,18 @@ th,td{padding:10px;text-align:center}
 th{background:#1e293b}
 tr:nth-child(even){background:#1e293b}
 
-select, button{padding:8px;border-radius:5px;margin-right:5px;border:none;cursor:pointer}
-button{background:#1e293b;color:white}
-button:hover{background:#334155}
+select,button{padding:8px;border-radius:5px;margin:5px;border:none}
+button{background:#1e293b;color:white;cursor:pointer}
 </style>
 </head>
 
 <body>
 
-<h1>📊 Dashboard Comercial - Modo Power BI</h1>
+<h1>📊 Dashboard Director Comercial</h1>
 
 <input type="file" id="fileInput" accept=".xlsx" />
 
-<div style="margin:20px 0; display:flex; flex-wrap:wrap; gap:10px;">
+<div>
 <select id="filtroSupervisor"></select>
 <select id="filtroAsesor"></select>
 
@@ -52,8 +51,10 @@ button:hover{background:#334155}
 <div class="card"><div>Total Abril</div><div id="total"></div></div>
 <div class="card"><div>Total Marzo</div><div id="marzo"></div></div>
 <div class="card"><div>Variación %</div><div id="variacion"></div></div>
-<div class="card"><div>Promedio Abril</div><div id="promedio"></div></div>
+<div class="card"><div>Promedio</div><div id="promedio"></div></div>
 <div class="card"><div>Estado</div><div id="estado"></div></div>
+<div class="card"><div>Prod Nuevos</div><div id="prodNuevos"></div></div>
+<div class="card"><div>Prod Antiguos</div><div id="prodAntiguos"></div></div>
 </div>
 
 <canvas id="variacionSup"></canvas>
@@ -70,7 +71,7 @@ button:hover{background:#334155}
 <th>Supervisor</th>
 <th>Marzo</th>
 <th>Abril</th>
-<th>Variación %</th>
+<th>%</th>
 </tr>
 </thead>
 <tbody id="tabla"></tbody>
@@ -78,205 +79,213 @@ button:hover{background:#334155}
 
 <script>
 
-let asesores = [];
-let dataGlobal = [];
+let dataGlobal=[];
 
 // ==================== CARGA ====================
-document.getElementById('fileInput').addEventListener('change', function(e) {
+document.getElementById('fileInput').addEventListener('change', function(e){
 
-    let file = e.target.files[0];
-    let reader = new FileReader();
+let file=e.target.files[0];
+let reader=new FileReader();
 
-    reader.onload = function(e) {
+reader.onload=function(e){
 
-        let data = new Uint8Array(e.target.result);
-        let workbook = XLSX.read(data, {type: 'array'});
+let data=new Uint8Array(e.target.result);
+let wb=XLSX.read(data,{type:'array'});
 
-        let hoja = workbook.Sheets[workbook.SheetNames[0]];
-        let json = XLSX.utils.sheet_to_json(hoja);
+let hoja=wb.Sheets[wb.SheetNames[0]];
+let json=XLSX.utils.sheet_to_json(hoja);
 
-        asesores = json.map(f => {
+dataGlobal=json.map(f=>{
 
-            let marzo = parseInt(f.Marzo);
-            let abril = parseInt(f.Abril);
+let marzo=parseInt(f.Marzo||f.MARZO||0);
+let abril=parseInt(f.Abril||f.ABRIL||0);
 
-            let variacion = abril - marzo;
-            let variacionPorc = marzo > 0 ? (variacion / marzo) * 100 : 0;
+let varr=abril-marzo;
+let porc=marzo>0?(varr/marzo)*100:0;
 
-            return {
-                n: f.Nombre,
-                s: f.Supervisor,
-                marzo: marzo,
-                abril: abril,
-                variacion: variacion,
-                variacionPorc: variacionPorc
-            }
-        });
+return{
+n:f.Nombre,
+s:f.Supervisor,
+marzo,
+abril,
+fecha:f["Fecha Ingreso"],
+variacion:varr,
+porc:porc
+}
+});
 
-        dataGlobal = [...asesores];
+render(dataGlobal);
+crearFiltros();
 
-        render(dataGlobal);
-        crearFiltros();
+};
 
-    };
+reader.readAsArrayBuffer(file);
 
-    reader.readAsArrayBuffer(file);
 });
 
 // ==================== RENDER ====================
 function render(data){
-    tabla(data);
-    kpis(data);
-    graficos(data);
-    alertas(data);
-}
-
-// ==================== TABLA ====================
-function tabla(data){
-    let tbody = document.getElementById("tabla");
-    tbody.innerHTML = "";
-
-    data.sort((a,b)=>b.abril-a.abril);
-
-    data.forEach(a=>{
-        let color = a.variacionPorc < 0 ? "red" : "green";
-
-        tbody.innerHTML += `
-        <tr>
-        <td>${a.n}</td>
-        <td>${a.s}</td>
-        <td>${a.marzo}</td>
-        <td>${a.abril}</td>
-        <td class="${color}">${a.variacionPorc.toFixed(1)}%</td>
-        </tr>`;
-    });
+tabla(data);
+kpis(data);
+graficos(data);
+alertas(data);
+antiguedad(data);
 }
 
 // ==================== KPIS ====================
 function kpis(data){
 
-    let totalAbril = data.reduce((a,b)=>a+b.abril,0);
-    let totalMarzo = data.reduce((a,b)=>a+b.marzo,0);
+let tA=data.reduce((a,b)=>a+b.abril,0);
+let tM=data.reduce((a,b)=>a+b.marzo,0);
 
-    let variacion = totalAbril - totalMarzo;
-    let porc = totalMarzo>0 ? (variacion/totalMarzo)*100 : 0;
+let varr=tA-tM;
+let porc=tM>0?(varr/tM)*100:0;
 
-    document.getElementById("total").innerText = totalAbril;
-    document.getElementById("marzo").innerText = totalMarzo;
-    document.getElementById("variacion").innerHTML = `<span class="${porc>=0?'green':'red'}">${porc.toFixed(1)}%</span>`;
-    document.getElementById("promedio").innerText = Math.round(totalAbril/data.length);
+document.getElementById("total").innerText=tA;
+document.getElementById("marzo").innerText=tM;
+document.getElementById("variacion").innerHTML=`<span class="${porc>=0?'green':'red'}">${porc.toFixed(1)}%</span>`;
+document.getElementById("promedio").innerText=Math.round(tA/data.length);
 
-    document.getElementById("estado").innerHTML = porc>=0 
-        ? "<span class='green'>Crecimiento</span>"
-        : "<span class='red'>Caída</span>";
+document.getElementById("estado").innerHTML=porc>=0?"<span class='green'>Crecimiento</span>":"<span class='red'>Caída</span>";
+
+}
+
+// ==================== TABLA ====================
+function tabla(data){
+
+let tbody=document.getElementById("tabla");
+tbody.innerHTML="";
+
+data.sort((a,b)=>b.abril-a.abril);
+
+data.forEach(a=>{
+let c=a.porc<0?"red":"green";
+
+tbody.innerHTML+=`<tr>
+<td>${a.n}</td>
+<td>${a.s}</td>
+<td>${a.marzo}</td>
+<td>${a.abril}</td>
+<td class="${c}">${a.porc.toFixed(1)}%</td>
+</tr>`;
+});
+
+}
+
+// ==================== ANTIGUEDAD ====================
+function antiguedad(data){
+
+let hoy=new Date();
+let nuevos=[],antiguos=[];
+
+data.forEach(a=>{
+let f=new Date(a.fecha);
+let m=(hoy-f)/(1000*60*60*24*30);
+
+if(m<=3)nuevos.push(a);
+else antiguos.push(a);
+});
+
+let pn=nuevos.reduce((a,b)=>a+b.abril,0)/(nuevos.length||1);
+let pa=antiguos.reduce((a,b)=>a+b.abril,0)/(antiguos.length||1);
+
+document.getElementById("prodNuevos").innerText=Math.round(pn);
+document.getElementById("prodAntiguos").innerText=Math.round(pa);
+
 }
 
 // ==================== GRAFICOS ====================
 function graficos(data){
 
-    let resumen = {};
+let res={};
 
-    data.forEach(a=>{
-        if(!resumen[a.s]) resumen[a.s]={marzo:0,abril:0};
-        resumen[a.s].marzo+=a.marzo;
-        resumen[a.s].abril+=a.abril;
-    });
+data.forEach(a=>{
+if(!res[a.s])res[a.s]={marzo:0,abril:0};
+res[a.s].marzo+=a.marzo;
+res[a.s].abril+=a.abril;
+});
 
-    let labels = Object.keys(resumen);
+let labels=Object.keys(res);
 
-    new Chart(document.getElementById('variacionSup'),{
-        type:'bar',
-        data:{
-            labels:labels,
-            datasets:[{
-                label:'Variación %',
-                data:labels.map(s=>{
-                    let m=resumen[s].marzo;
-                    let a=resumen[s].abril;
-                    return m>0 ? ((a-m)/m)*100 : 0;
-                })
-            }]
-        }
-    });
+new Chart(document.getElementById('variacionSup'),{
+type:'bar',
+data:{labels:labels,datasets:[{
+label:'Variación %',
+data:labels.map(s=>{
+let m=res[s].marzo,a=res[s].abril;
+return m>0?((a-m)/m)*100:0;
+})
+}]}
+});
 
-    new Chart(document.getElementById('proyeccionSup'),{
-        type:'bar',
-        data:{
-            labels:labels,
-            datasets:[{
-                label:'Proyección',
-                data:labels.map(s=>{
-                    let diaria = resumen[s].abril / 15;
-                    return Math.round(diaria * 30);
-                })
-            }]
-        }
-    });
+new Chart(document.getElementById('proyeccionSup'),{
+type:'bar',
+data:{labels:labels,datasets:[{
+label:'Proyección',
+data:labels.map(s=>{
+let d=res[s].abril/15;
+return Math.round(d*30);
+})
+}]}
+});
+
 }
 
 // ==================== ALERTAS ====================
 function alertas(data){
-    let ul=document.getElementById("alertas");
-    ul.innerHTML="";
 
-    data.forEach(a=>{
-        if(a.variacionPorc < -20){
-            ul.innerHTML+=`<li class="red">🚨 ${a.n} caída fuerte (${a.variacionPorc.toFixed(1)}%)</li>`;
-        } else if(a.variacionPorc < 0){
-            ul.innerHTML+=`<li class="yellow">⚠️ ${a.n} descenso (${a.variacionPorc.toFixed(1)}%)</li>`;
-        }
-    });
+let ul=document.getElementById("alertas");
+ul.innerHTML="";
+
+data.forEach(a=>{
+if(a.porc<-20)ul.innerHTML+=`<li class="red">🚨 ${a.n} (${a.porc.toFixed(1)}%)</li>`;
+else if(a.porc<0)ul.innerHTML+=`<li class="yellow">⚠️ ${a.n} (${a.porc.toFixed(1)}%)</li>`;
+});
+
 }
 
 // ==================== FILTROS ====================
 function crearFiltros(){
 
-    let sup = [...new Set(asesores.map(a=>a.s))];
-    let ase = [...new Set(asesores.map(a=>a.n))];
+let sup=[...new Set(dataGlobal.map(a=>a.s))];
+let ase=[...new Set(dataGlobal.map(a=>a.n))];
 
-    let s = document.getElementById("filtroSupervisor");
-    let a = document.getElementById("filtroAsesor");
+let s=document.getElementById("filtroSupervisor");
+let a=document.getElementById("filtroAsesor");
 
-    s.innerHTML="<option value=''>Supervisor</option>";
-    a.innerHTML="<option value=''>Asesor</option>";
+s.innerHTML="<option value=''>Supervisor</option>";
+a.innerHTML="<option value=''>Asesor</option>";
 
-    sup.forEach(x=>s.innerHTML+=`<option>${x}</option>`);
-    ase.forEach(x=>a.innerHTML+=`<option>${x}</option>`);
+sup.forEach(x=>s.innerHTML+=`<option>${x}</option>`);
+ase.forEach(x=>a.innerHTML+=`<option>${x}</option>`);
 
-    s.onchange = aplicarFiltros;
-    a.onchange = aplicarFiltros;
+s.onchange=aplicarFiltros;
+a.onchange=aplicarFiltros;
+
 }
 
 function aplicarFiltros(){
 
-    let sup=document.getElementById("filtroSupervisor").value;
-    let ase=document.getElementById("filtroAsesor").value;
+let sup=document.getElementById("filtroSupervisor").value;
+let ase=document.getElementById("filtroAsesor").value;
 
-    let filtrado=dataGlobal.filter(x=>{
-        return (!sup||x.s===sup)&&(!ase||x.n===ase);
-    });
+let f=dataGlobal.filter(x=>(!sup||x.s===sup)&&(!ase||x.n===ase));
 
-    render(filtrado);
+render(f);
+
 }
 
 // ==================== BOTONES ====================
 function filtrarTipo(tipo){
 
-    let data = [...dataGlobal];
+let d=[...dataGlobal];
 
-    if(tipo==="top"){
-        data = data.filter(a=>a.variacionPorc > 10);
-    }
+if(tipo==="top")d=d.filter(a=>a.porc>10);
+if(tipo==="criticos")d=d.filter(a=>a.porc<-10);
+if(tipo==="crecimiento")d=d.filter(a=>a.porc>0);
 
-    if(tipo==="criticos"){
-        data = data.filter(a=>a.variacionPorc < -10);
-    }
+render(d);
 
-    if(tipo==="crecimiento"){
-        data = data.filter(a=>a.variacionPorc > 0);
-    }
-
-    render(data);
 }
 
 </script>
