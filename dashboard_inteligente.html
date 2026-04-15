@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Inteligente</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body {font-family: Arial; background:#0f172a; color:white; padding:20px;}
+h1{text-align:center;}
+.container{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px;}
+.card{background:#1e293b;padding:15px;border-radius:12px;text-align:center;}
+.green{color:#22c55e;} .yellow{color:#eab308;} .red{color:#ef4444;}
+button{padding:10px;border:none;border-radius:8px;margin:5px;cursor:pointer;}
+table{width:100%;margin-top:20px;border-collapse:collapse;}
+th,td{padding:10px;text-align:center;}
+th{background:#1e293b;}
+tr:nth-child(even){background:#1e293b;}
+canvas{background:white;border-radius:10px;margin-top:20px;}
+</style>
+</head>
+
+<body>
+
+<h1>📊 Dashboard Inteligente Comercial</h1>
+
+<div class="container">
+<div class="card"><div>Ventas Marzo</div><div id="marzo">3459</div></div>
+<div class="card"><div>Proyección Abril</div><div id="abril">3747</div></div>
+<div class="card"><div>Variación</div><div id="var" class="green">+8.3%</div></div>
+<div class="card"><div>Estado</div><div id="estado"></div></div>
+</div>
+
+<div>
+<button onclick="filtrar('Todos')">Todos</button>
+<button onclick="filtrar('Top')">Top</button>
+<button onclick="filtrar('Medio')">Medio</button>
+<button onclick="filtrar('Bajo')">Críticos</button>
+</div>
+
+<canvas id="supChart"></canvas>
+<canvas id="trendChart"></canvas>
+
+<h2>🚨 Alertas</h2>
+<ul id="alertas"></ul>
+
+<h2>📋 Ranking</h2>
+<table>
+<thead><tr><th>Asesor</th><th>Supervisor</th><th>Ventas</th><th>Estado</th></tr></thead>
+<tbody id="tabla"></tbody>
+</table>
+
+<script>
+
+let asesores = [
+{n:"Helen",s:"Carlos Escru",v:78},
+{n:"Dahyanna",s:"Carlos Escru",v:74},
+{n:"Isabella",s:"Carlos Escru",v:70},
+{n:"Juan G",s:"Juan Castillo",v:68},
+{n:"Gerardo",s:"Juan Castillo",v:64},
+{n:"A1",s:"Jhojann",v:10},
+{n:"A2",s:"Kahyl",v:15}
+];
+
+let supervisores = {
+"Juan Castillo":{mar:1185,abr:1285},
+"Carlos Escru":{mar:951,abr:1080},
+"Kahyl":{mar:735,abr:785},
+"Jhojann":{mar:588,abr:597}
+};
+
+function estado(v){
+if(v>=60)return ["Top","green"];
+if(v>=40)return ["Medio","yellow"];
+return ["Bajo","red"];
+}
+
+function cargarTabla(filtro="Todos"){
+let tbody=document.getElementById("tabla");
+tbody.innerHTML="";
+let filtrados=asesores.filter(a=>{
+let e=estado(a.v)[0];
+return filtro==="Todos"||e===filtro;
+});
+
+filtrados.sort((a,b)=>b.v-a.v);
+
+filtrados.forEach(a=>{
+let est=estado(a.v);
+tbody.innerHTML+=`<tr>
+<td>${a.n}</td>
+<td>${a.s}</td>
+<td>${a.v}</td>
+<td class="${est[1]}">${est[0]}</td>
+</tr>`;
+});
+
+generarAlertas();
+}
+
+function generarAlertas(){
+let ul=document.getElementById("alertas");
+ul.innerHTML="";
+
+asesores.forEach(a=>{
+if(a.v<20){
+ul.innerHTML+=`<li class="red">⚠️ ${a.n} en nivel crítico</li>`;
+}
+});
+
+for(let s in supervisores){
+let varr=supervisores[s].abr-supervisores[s].mar;
+if(varr<20){
+ul.innerHTML+=`<li class="red">⚠️ ${s} sin crecimiento</li>`;
+}
+}
+}
+
+function graficos(){
+new Chart(document.getElementById("supChart"),{
+type:'bar',
+data:{
+labels:Object.keys(supervisores),
+datasets:[{
+label:'Proyección Abril',
+data:Object.values(supervisores).map(x=>x.abr)
+}]
+}
+});
+
+new Chart(document.getElementById("trendChart"),{
+type:'line',
+data:{
+labels:Object.keys(supervisores),
+datasets:[{
+label:'Variación',
+data:Object.values(supervisores).map(x=>x.abr-x.mar)
+}]
+}
+});
+}
+
+function filtrar(f){
+cargarTabla(f);
+}
+
+let prom=3747/90;
+let est=document.getElementById("estado");
+if(prom>=50)est.innerHTML="<span class='green'>Saludable</span>";
+else if(prom>=35)est.innerHTML="<span class='yellow'>Estable</span>";
+else est.innerHTML="<span class='red'>Crítico</span>";
+
+cargarTabla();
+graficos();
+
+</script>
+
+</body>
+</html>
