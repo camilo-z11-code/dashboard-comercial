@@ -10,22 +10,16 @@
 <style>
 body{font-family:Arial;background:#0f172a;color:white;padding:20px}
 h1{text-align:center}
-
 .container{display:grid;grid-template-columns:repeat(6,1fr);gap:15px;margin-bottom:20px}
-
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
-
 .green{color:#22c55e}
 .yellow{color:#eab308}
 .red{color:#ef4444}
-
 canvas{background:white;border-radius:10px;margin-top:20px}
-
 table{width:100%;margin-top:20px;border-collapse:collapse}
 th,td{padding:10px;text-align:center}
 th{background:#1e293b}
 tr:nth-child(even){background:#1e293b}
-
 select,button{padding:8px;border-radius:5px;margin:5px;border:none}
 button{background:#1e293b;color:white;cursor:pointer}
 </style>
@@ -108,7 +102,7 @@ n:f.Nombre,
 s:f.Supervisor,
 marzo,
 abril,
-fecha:f["Fecha Ingreso"],
+fecha:f["Fecha Ingreso"]||f["FECHA INGRESO"],
 variacion:varr,
 porc:porc
 }
@@ -172,22 +166,43 @@ tbody.innerHTML+=`<tr>
 
 }
 
-// ==================== ANTIGUEDAD ====================
+// ==================== ANTIGUEDAD PROYECTADA ====================
 function antiguedad(data){
 
 let hoy=new Date();
+let dia=hoy.getDate();
+let diasMes=30;
+
 let nuevos=[],antiguos=[];
 
 data.forEach(a=>{
-let f=new Date(a.fecha);
-let m=(hoy-f)/(1000*60*60*24*30);
 
-if(m<=3)nuevos.push(a);
-else antiguos.push(a);
+if(!a.fecha)return;
+
+let fecha;
+
+if(typeof a.fecha==="number"){
+fecha=new Date((a.fecha-25569)*86400*1000);
+}else{
+fecha=new Date(a.fecha);
+}
+
+if(isNaN(fecha))return;
+
+let meses=(hoy-fecha)/(1000*60*60*24*30);
+
+// 🔥 PROYECCIÓN ABRIL
+let proy=(a.abril/dia)*diasMes;
+
+let obj={...a,proy:proy};
+
+if(meses<=3)nuevos.push(obj);
+else antiguos.push(obj);
+
 });
 
-let pn=nuevos.reduce((a,b)=>a+b.abril,0)/(nuevos.length||1);
-let pa=antiguos.reduce((a,b)=>a+b.abril,0)/(antiguos.length||1);
+let pn=nuevos.length?nuevos.reduce((a,b)=>a+b.proy,0)/nuevos.length:0;
+let pa=antiguos.length?antiguos.reduce((a,b)=>a+b.proy,0)/antiguos.length:0;
 
 document.getElementById("prodNuevos").innerText=Math.round(pn);
 document.getElementById("prodAntiguos").innerText=Math.round(pa);
@@ -221,10 +236,10 @@ return m>0?((a-m)/m)*100:0;
 new Chart(document.getElementById('proyeccionSup'),{
 type:'bar',
 data:{labels:labels,datasets:[{
-label:'Proyección',
+label:'Proyección Abril',
 data:labels.map(s=>{
-let d=res[s].abril/15;
-return Math.round(d*30);
+let diaria=res[s].abril/15;
+return Math.round(diaria*30);
 })
 }]}
 });
