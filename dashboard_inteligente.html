@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Operativo Inteligente</title>
+<title>Dashboard Director Comercial</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -16,7 +16,7 @@ h1{text-align:center}
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
 
 .green{color:#22c55e}
-yellow{color:#eab308}
+.yellow{color:#eab308}
 .red{color:#ef4444}
 
 canvas{background:white;border-radius:10px;margin-top:20px}
@@ -25,6 +25,8 @@ table{width:100%;margin-top:20px;border-collapse:collapse}
 th,td{padding:10px;text-align:center}
 th{background:#1e293b}
 tr:nth-child(even){background:#1e293b}
+
+select{padding:8px;margin-right:10px;border-radius:5px}
 </style>
 </head>
 
@@ -33,6 +35,11 @@ tr:nth-child(even){background:#1e293b}
 <h1>📊 Dashboard Director Comercial</h1>
 
 <input type="file" id="fileInput" accept=".xlsx" />
+
+<div style="margin:20px 0;">
+<select id="filtroSupervisor"></select>
+<select id="filtroAsesor"></select>
+</div>
 
 <div class="container">
 <div class="card"><div>Total Abril</div><div id="total"></div></div>
@@ -77,46 +84,41 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
         let data = new Uint8Array(e.target.result);
         let workbook = XLSX.read(data, {type: 'array'});
 
-        // 👇 BUSCA LA HOJA PRODUCTIVIDAD MOVIL
-        let sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes("movil")) 
-                        || workbook.SheetNames[0];
-
-        let hoja = workbook.Sheets[sheetName];
+        let hoja = workbook.Sheets[workbook.SheetNames[0]];
         let json = XLSX.utils.sheet_to_json(hoja);
 
-        asesores = json.map(f => {
+        asesores = json.map(f => ({
+            n: f.Nombre,
+            s: f.Supervisor,
+            marzo: parseInt(f.Marzo),
+            abril: parseInt(f.Abril),
+            variacion: parseInt(f.Abril) - parseInt(f.Marzo)
+        }));
 
-            let marzo = parseInt(f.Marzo || f.MARZO || f.marzo || 0);
-            let abril = parseInt(f.Abril || f.ABRIL || f.abril || 0);
-
-            return {
-                n: f.Nombre || f.ASESOR || f.Asesor,
-                s: f.Supervisor || f.SUPERVISOR,
-                marzo: marzo,
-                abril: abril,
-                variacion: abril - marzo
-            }
-        });
-
-        cargarTabla();
-        analisisGeneral();
-        graficos();
-        alertas();
+        actualizarTodo(asesores);
 
     };
 
     reader.readAsArrayBuffer(file);
 });
 
-// ==================== TABLA ====================
-function cargarTabla(){
+// ==================== CORE ====================
+function actualizarTodo(data){
+    cargarTabla(data);
+    analisisGeneral(data);
+    graficos(data);
+    alertas(data);
+    crearFiltros();
+}
 
+// ==================== TABLA ====================
+function cargarTabla(data){
     let tbody = document.getElementById("tabla");
     tbody.innerHTML = "";
 
-    asesores.sort((a,b)=>b.abril-a.abril);
+    data.sort((a,b)=>b.abril-a.abril);
 
-    asesores.forEach(a=>{
+    data.forEach(a=>{
         let color = a.variacion < 0 ? "red" : "green";
 
         tbody.innerHTML += `
@@ -131,16 +133,24 @@ function cargarTabla(){
 }
 
 // ==================== KPIs ====================
-function analisisGeneral(){
+function analisisGeneral(data){
 
-    let totalAbril = asesores.reduce((a,b)=>a+b.abril,0);
-    let totalMarzo = asesores.reduce((a,b)=>a+b.marzo,0);
+    let totalAbril = data.reduce((a,b)=>a+b.abril,0);
+    let totalMarzo = data.reduce((a,b)=>a+b.marzo,0);
+
     let variacion = totalAbril - totalMarzo;
-    let prom = Math.round(totalAbril / asesores.length);
+
+    let variacionPorc = totalMarzo > 0 
+        ? ((variacion / totalMarzo) * 100).toFixed(1)
+        : 0;
 
     document.getElementById("total").innerText = totalAbril;
     document.getElementById("marzo").innerText = totalMarzo;
-    document.getElementById("variacion").innerText = variacion;
+
+    let color = variacion >= 0 ? "green" : "red";
+    document.getElementById("variacion").innerHTML = `<span class="${color}">${variacionPorc}%</span>`;
+
+    let prom = Math.round(totalAbril / data.length);
     document.getElementById("promedio").innerText = prom;
 
     let estado = document.getElementById("estado");
@@ -150,11 +160,11 @@ function analisisGeneral(){
 }
 
 // ==================== GRAFICOS ====================
-function graficos(){
+function graficos(data){
 
     let resumen = {};
 
-    asesores.forEach(a=>{
+    data.forEach(a=>{
         if(!resumen[a.s]){
             resumen[a.s] = {marzo:0, abril:0}
         }
@@ -164,21 +174,16 @@ function graficos(){
 
     let labels = Object.keys(resumen);
 
-    // Variación por supervisor
     new Chart(document.getElementById('variacionSup'),{
         type:'bar',
         data:{
             labels:labels,
             datasets:[{
-                label:'Variación',
+                label:'Variación por Supervisor',
                 data:labels.map(s=>resumen[s].abril - resumen[s].marzo)
             }]
         }
     });
-
-    // Proyección
-    let dias = 15;
-    let mes = 30;
 
     new Chart(document.getElementById('proyeccionSup'),{
         type:'bar',
@@ -187,8 +192,8 @@ function graficos(){
             datasets:[{
                 label:'Proyección Abril',
                 data:labels.map(s=>{
-                    let diaria = resumen[s].abril / dias;
-                    return Math.round(diaria * mes);
+                    let diaria = resumen[s].abril / 15;
+                    return Math.round(diaria * 30);
                 })
             }]
         }
@@ -196,12 +201,12 @@ function graficos(){
 }
 
 // ==================== ALERTAS ====================
-function alertas(){
+function alertas(data){
 
     let ul = document.getElementById("alertas");
     ul.innerHTML = "";
 
-    asesores.forEach(a=>{
+    data.forEach(a=>{
         if(a.variacion < -10){
             ul.innerHTML += `<li class="red">🚨 ${a.n} caída fuerte (${a.variacion})</li>`;
         } 
@@ -209,6 +214,42 @@ function alertas(){
             ul.innerHTML += `<li class="yellow">⚠️ ${a.n} en descenso (${a.variacion})</li>`;
         }
     });
+}
+
+// ==================== FILTROS ====================
+function crearFiltros(){
+
+    let supSelect = document.getElementById("filtroSupervisor");
+    let aseSelect = document.getElementById("filtroAsesor");
+
+    let supervisores = [...new Set(asesores.map(a=>a.s))];
+    let ases = [...new Set(asesores.map(a=>a.n))];
+
+    supSelect.innerHTML = "<option value=''>Todos los supervisores</option>";
+    aseSelect.innerHTML = "<option value=''>Todos los asesores</option>";
+
+    supervisores.forEach(s=>{
+        supSelect.innerHTML += `<option value="${s}">${s}</option>`;
+    });
+
+    ases.forEach(a=>{
+        aseSelect.innerHTML += `<option value="${a}">${a}</option>`;
+    });
+
+    supSelect.onchange = aplicarFiltros;
+    aseSelect.onchange = aplicarFiltros;
+}
+
+function aplicarFiltros(){
+
+    let sup = document.getElementById("filtroSupervisor").value;
+    let ase = document.getElementById("filtroAsesor").value;
+
+    let filtrados = asesores.filter(a=>{
+        return (!sup || a.s === sup) && (!ase || a.n === ase);
+    });
+
+    actualizarTodo(filtrados);
 }
 
 </script>
