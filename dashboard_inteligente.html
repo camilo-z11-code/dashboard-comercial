@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Comercial Inteligente</title>
+<title>Dashboard Operativo Inteligente</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -11,12 +11,12 @@
 body{font-family:Arial;background:#0f172a;color:white;padding:20px}
 h1{text-align:center}
 
-.container{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px}
+.container{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:20px}
 
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
 
 .green{color:#22c55e}
-.yellow{color:#eab308}
+yellow{color:#eab308}
 .red{color:#ef4444}
 
 canvas{background:white;border-radius:10px;margin-top:20px}
@@ -30,21 +30,22 @@ tr:nth-child(even){background:#1e293b}
 
 <body>
 
-<h1>📊 Dashboard Comercial Inteligente</h1>
+<h1>📊 Dashboard Director Comercial</h1>
 
 <input type="file" id="fileInput" accept=".xlsx" />
 
 <div class="container">
-<div class="card"><div>Estado</div><div id="estado"></div></div>
+<div class="card"><div>Total Abril</div><div id="total"></div></div>
+<div class="card"><div>Total Marzo</div><div id="marzo"></div></div>
+<div class="card"><div>Variación</div><div id="variacion"></div></div>
 <div class="card"><div>Promedio</div><div id="promedio"></div></div>
-<div class="card"><div>Total Ventas</div><div id="total"></div></div>
-<div class="card"><div>Asesores</div><div id="cantidad"></div></div>
+<div class="card"><div>Estado</div><div id="estado"></div></div>
 </div>
 
 <canvas id="variacionSup"></canvas>
 <canvas id="proyeccionSup"></canvas>
 
-<h2>🚨 Alertas</h2>
+<h2>🚨 Alertas críticas</h2>
 <ul id="alertas"></ul>
 
 <h2>📋 Ranking</h2>
@@ -53,7 +54,9 @@ tr:nth-child(even){background:#1e293b}
 <tr>
 <th>Asesor</th>
 <th>Supervisor</th>
-<th>Ventas</th>
+<th>Marzo</th>
+<th>Abril</th>
+<th>Variación</th>
 </tr>
 </thead>
 <tbody id="tabla"></tbody>
@@ -63,118 +66,7 @@ tr:nth-child(even){background:#1e293b}
 
 let asesores = [];
 
-// ================= TABLA =================
-function cargarTabla(){
-    let tbody = document.getElementById("tabla");
-    tbody.innerHTML = "";
-
-    asesores.sort((a,b)=>b.v-a.v);
-
-    asesores.forEach(a=>{
-        tbody.innerHTML += `
-        <tr>
-        <td>${a.n}</td>
-        <td>${a.s}</td>
-        <td>${a.v}</td>
-        </tr>`;
-    });
-
-    let total = asesores.reduce((acc,a)=>acc+a.v,0);
-    let prom = Math.round(total / asesores.length || 0);
-
-    document.getElementById("total").innerText = total;
-    document.getElementById("promedio").innerText = prom;
-    document.getElementById("cantidad").innerText = asesores.length;
-
-    let estado = document.getElementById("estado");
-
-    if(prom >= 50) estado.innerHTML="<span class='green'>Saludable</span>";
-    else if(prom >= 35) estado.innerHTML="<span class='yellow'>Estable</span>";
-    else estado.innerHTML="<span class='red'>Crítico</span>";
-}
-
-
-// ================= ANALISIS =================
-function construirResumen(){
-    let resumen = {};
-    asesores.forEach(a=>{
-        if(!resumen[a.s]){
-            resumen[a.s] = {total:0, count:0}
-        }
-        resumen[a.s].total += a.v;
-        resumen[a.s].count += 1;
-    });
-    return resumen;
-}
-
-function variacionVsMeta(resumen){
-
-    const meta = 45;
-
-    let labels = Object.keys(resumen);
-    let data = labels.map(s=>{
-        let prom = resumen[s].total / resumen[s].count;
-        return Math.round(prom - meta);
-    });
-
-    new Chart(document.getElementById('variacionSup'),{
-        type:'bar',
-        data:{
-            labels:labels,
-            datasets:[{
-                label:'Variación vs Meta',
-                data:data
-            }]
-        }
-    });
-}
-
-function proyeccionSupervisor(resumen){
-
-    let diasMes = 30;
-    let diasActuales = 15;
-
-    let labels = Object.keys(resumen);
-    let data = labels.map(s=>{
-        let actual = resumen[s].total;
-        let diaria = actual / diasActuales;
-        return Math.round(diaria * diasMes);
-    });
-
-    new Chart(document.getElementById('proyeccionSup'),{
-        type:'bar',
-        data:{
-            labels:labels,
-            datasets:[{
-                label:'Proyección Abril',
-                data:data
-            }]
-        }
-    });
-}
-
-function alertas(){
-    let ul = document.getElementById("alertas");
-    ul.innerHTML = "";
-
-    asesores.forEach(a=>{
-        if(a.v < 20){
-            ul.innerHTML += `<li class="red">🚨 ${a.n} crítico</li>`;
-        } else if(a.v < 40){
-            ul.innerHTML += `<li class="yellow">⚠️ ${a.n} bajo</li>`;
-        }
-    });
-}
-
-function ejecutarAnalisis(){
-    let resumen = construirResumen();
-    variacionVsMeta(resumen);
-    proyeccionSupervisor(resumen);
-    alertas();
-}
-
-
-// ================= EXCEL =================
+// ==================== CARGA EXCEL ====================
 document.getElementById('fileInput').addEventListener('change', function(e) {
 
     let file = e.target.files[0];
@@ -185,21 +77,139 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
         let data = new Uint8Array(e.target.result);
         let workbook = XLSX.read(data, {type: 'array'});
 
-        let hoja = workbook.Sheets[workbook.SheetNames[0]];
+        // 👇 BUSCA LA HOJA PRODUCTIVIDAD MOVIL
+        let sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes("movil")) 
+                        || workbook.SheetNames[0];
+
+        let hoja = workbook.Sheets[sheetName];
         let json = XLSX.utils.sheet_to_json(hoja);
 
-        asesores = json.map(f => ({
-            n: f.Nombre || f.NOMBRE,
-            s: f.Supervisor || f.SUPERVISOR,
-            v: parseInt(f.Ventas || f.VENTAS || 0)
-        }));
+        asesores = json.map(f => {
+
+            let marzo = parseInt(f.Marzo || f.MARZO || f.marzo || 0);
+            let abril = parseInt(f.Abril || f.ABRIL || f.abril || 0);
+
+            return {
+                n: f.Nombre || f.ASESOR || f.Asesor,
+                s: f.Supervisor || f.SUPERVISOR,
+                marzo: marzo,
+                abril: abril,
+                variacion: abril - marzo
+            }
+        });
 
         cargarTabla();
-        ejecutarAnalisis();
+        analisisGeneral();
+        graficos();
+        alertas();
+
     };
 
     reader.readAsArrayBuffer(file);
 });
+
+// ==================== TABLA ====================
+function cargarTabla(){
+
+    let tbody = document.getElementById("tabla");
+    tbody.innerHTML = "";
+
+    asesores.sort((a,b)=>b.abril-a.abril);
+
+    asesores.forEach(a=>{
+        let color = a.variacion < 0 ? "red" : "green";
+
+        tbody.innerHTML += `
+        <tr>
+        <td>${a.n}</td>
+        <td>${a.s}</td>
+        <td>${a.marzo}</td>
+        <td>${a.abril}</td>
+        <td class="${color}">${a.variacion}</td>
+        </tr>`;
+    });
+}
+
+// ==================== KPIs ====================
+function analisisGeneral(){
+
+    let totalAbril = asesores.reduce((a,b)=>a+b.abril,0);
+    let totalMarzo = asesores.reduce((a,b)=>a+b.marzo,0);
+    let variacion = totalAbril - totalMarzo;
+    let prom = Math.round(totalAbril / asesores.length);
+
+    document.getElementById("total").innerText = totalAbril;
+    document.getElementById("marzo").innerText = totalMarzo;
+    document.getElementById("variacion").innerText = variacion;
+    document.getElementById("promedio").innerText = prom;
+
+    let estado = document.getElementById("estado");
+
+    if(variacion > 0) estado.innerHTML="<span class='green'>Crecimiento</span>";
+    else estado.innerHTML="<span class='red'>Caída</span>";
+}
+
+// ==================== GRAFICOS ====================
+function graficos(){
+
+    let resumen = {};
+
+    asesores.forEach(a=>{
+        if(!resumen[a.s]){
+            resumen[a.s] = {marzo:0, abril:0}
+        }
+        resumen[a.s].marzo += a.marzo;
+        resumen[a.s].abril += a.abril;
+    });
+
+    let labels = Object.keys(resumen);
+
+    // Variación por supervisor
+    new Chart(document.getElementById('variacionSup'),{
+        type:'bar',
+        data:{
+            labels:labels,
+            datasets:[{
+                label:'Variación',
+                data:labels.map(s=>resumen[s].abril - resumen[s].marzo)
+            }]
+        }
+    });
+
+    // Proyección
+    let dias = 15;
+    let mes = 30;
+
+    new Chart(document.getElementById('proyeccionSup'),{
+        type:'bar',
+        data:{
+            labels:labels,
+            datasets:[{
+                label:'Proyección Abril',
+                data:labels.map(s=>{
+                    let diaria = resumen[s].abril / dias;
+                    return Math.round(diaria * mes);
+                })
+            }]
+        }
+    });
+}
+
+// ==================== ALERTAS ====================
+function alertas(){
+
+    let ul = document.getElementById("alertas");
+    ul.innerHTML = "";
+
+    asesores.forEach(a=>{
+        if(a.variacion < -10){
+            ul.innerHTML += `<li class="red">🚨 ${a.n} caída fuerte (${a.variacion})</li>`;
+        } 
+        else if(a.variacion < 0){
+            ul.innerHTML += `<li class="yellow">⚠️ ${a.n} en descenso (${a.variacion})</li>`;
+        }
+    });
+}
 
 </script>
 
