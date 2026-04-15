@@ -15,18 +15,16 @@ h1{text-align:center}
 .container{display:grid;grid-template-columns:repeat(6,1fr);gap:15px;margin-bottom:20px}
 .card{background:#1e293b;padding:15px;border-radius:12px;text-align:center}
 
-/* COLORES */
 .green{color:#22c55e}
 .yellow{color:#eab308}
 .red{color:#ef4444}
 
-/* 🔥 GRAFICAS MÁS PEQUEÑAS */
+/* GRAFICOS */
 .graficos{
 display:grid;
 grid-template-columns:1fr 1fr;
 gap:20px;
 }
-
 canvas{
 background:white;
 border-radius:10px;
@@ -71,7 +69,6 @@ button{background:#1e293b;color:white;cursor:pointer}
 <div class="card"><div>Prod Antiguos</div><div id="prodAntiguos"></div></div>
 </div>
 
-<!-- 🔥 GRAFICOS -->
 <div class="graficos">
 <canvas id="variacionSup"></canvas>
 <canvas id="proyeccionSup"></canvas>
@@ -97,7 +94,10 @@ button{background:#1e293b;color:white;cursor:pointer}
 <script>
 
 let dataGlobal=[];
+let chart1=null;
+let chart2=null;
 
+// ================= UTIL =================
 function numeroSeguro(v){
     if(!v) return 0;
     return Number(v.toString().replace(",","").trim())||0;
@@ -157,7 +157,7 @@ n:f.Nombre,
 s:f.Supervisor,
 marzo,
 abril,
-fecha:f["Fecha Ingreso"]||f["FECHA INGRESO"],
+fecha:f["Fecha Ingreso"] || f["FECHA INGRESO"] || f["Fecha_Ingreso"],
 porc
 }
 });
@@ -195,11 +195,29 @@ document.getElementById("promedio").innerText=Math.round(tA/data.length);
 document.getElementById("estado").innerHTML=porc>=0?"<span class='green'>Crecimiento</span>":"<span class='red'>Caída</span>";
 }
 
-// ================= PRODUCTIVIDAD (PROMEDIO) =================
+// ================= TABLA =================
+function tabla(data){
+
+let t=document.getElementById("tabla");
+t.innerHTML="";
+
+data.sort((a,b)=>b.abril-a.abril);
+
+data.forEach(a=>{
+t.innerHTML+=`<tr>
+<td>${a.n}</td>
+<td>${a.s}</td>
+<td>${a.marzo}</td>
+<td>${a.abril}</td>
+<td class="${a.porc<0?'red':'green'}">${a.porc.toFixed(1)}%</td>
+</tr>`;
+});
+}
+
+// ================= PRODUCTIVIDAD =================
 function antiguedad(data){
 
 let hoy=new Date();
-
 let nuevos=[],antiguos=[];
 
 data.forEach(a=>{
@@ -210,7 +228,7 @@ let fecha;
 
 if(typeof a.fecha==="number"){
 fecha=new Date((a.fecha-25569)*86400*1000);
-}else if(a.fecha.includes("/")){
+}else if(typeof a.fecha==="string" && a.fecha.includes("/")){
 let p=a.fecha.split("/");
 fecha=new Date(p[2],p[1]-1,p[0]);
 }else{
@@ -269,7 +287,11 @@ res[a.s].abril+=a.abril;
 
 let labels=Object.keys(res);
 
-new Chart(document.getElementById("variacionSup"),{
+// 🔥 evitar bug chart
+if(chart1) chart1.destroy();
+if(chart2) chart2.destroy();
+
+chart1 = new Chart(document.getElementById("variacionSup"),{
 type:'bar',
 data:{
 labels:labels,
@@ -283,7 +305,7 @@ return m>0?((a-m)/m)*100:0;
 }
 });
 
-new Chart(document.getElementById("proyeccionSup"),{
+chart2 = new Chart(document.getElementById("proyeccionSup"),{
 type:'bar',
 data:{
 labels:labels,
@@ -293,6 +315,7 @@ data:labels.map(s=>proyeccion(res[s].abril))
 }]
 }
 });
+
 }
 
 // ================= FILTROS =================
