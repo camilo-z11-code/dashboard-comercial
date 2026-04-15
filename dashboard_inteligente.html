@@ -81,7 +81,7 @@ function numeroSeguro(v){
     return Number(v.toString().replace(",","").trim())||0;
 }
 
-// ================= CALENDARIO (PROYECCIÓN) =================
+// ================= CALENDARIO =================
 function esFestivo(fecha){
     const festivos=["2026-01-01","2026-05-01","2026-07-20"];
     return festivos.includes(fecha.toISOString().split("T")[0]);
@@ -225,7 +225,6 @@ if(isNaN(fecha)) return;
 
 let meses=(hoy-fecha)/(1000*60*60*24*30);
 
-// 🔥 SOLO ABRIL REAL
 if(meses<=3){
 nuevos.push(a.abril);
 }else{
@@ -240,7 +239,7 @@ let pa=antiguos.length?antiguos.reduce((a,b)=>a+b,0)/antiguos.length:0;
 document.getElementById("prodNuevos").innerText=Math.round(pn);
 document.getElementById("prodAntiguos").innerText=Math.round(pa);
 
-// ALERTAS
+// ALERTAS ESTRUCTURA
 let ul=document.getElementById("alertas");
 
 if(nuevos.length===0){
@@ -250,6 +249,29 @@ ul.innerHTML+=`<li class="red">🚨 No hay asesores nuevos</li>`;
 if(nuevos.length>0 && pn < pa*0.7){
 ul.innerHTML+=`<li class="yellow">⚠️ Nuevos rinden por debajo</li>`;
 }
+
+}
+
+// ================= ALERTAS ORDENADAS =================
+function alertas(data){
+
+let ul=document.getElementById("alertas");
+
+// ORDENAR POR PEOR IMPACTO
+let ordenados=[...data].sort((a,b)=>a.porc-b.porc);
+
+ordenados.forEach(a=>{
+
+let diff=a.abril-a.marzo;
+
+if(a.porc < -20){
+ul.innerHTML+=`<li class="red">🚨 ${a.n} (${a.porc.toFixed(1)}% | ${diff})</li>`;
+}
+else if(a.porc < 0){
+ul.innerHTML+=`<li class="yellow">⚠️ ${a.n} (${a.porc.toFixed(1)}% | ${diff})</li>`;
+}
+
+});
 
 }
 
@@ -281,7 +303,7 @@ return m>0?((a-m)/m)*100:0;
 }
 });
 
-// PROYECCION REAL (LABORAL)
+// PROYECCION
 new Chart(document.getElementById("proyeccionSup"),{
 type:'bar',
 data:{
@@ -293,17 +315,6 @@ data:labels.map(s=>proyeccion(res[s].abril))
 }
 });
 
-}
-
-// ================= ALERTAS BASE =================
-function alertas(data){
-
-let ul=document.getElementById("alertas");
-
-data.forEach(a=>{
-if(a.porc<-20)ul.innerHTML+=`<li class="red">🚨 ${a.n}</li>`;
-else if(a.porc<0)ul.innerHTML+=`<li class="yellow">⚠️ ${a.n}</li>`;
-});
 }
 
 // ================= FILTROS =================
