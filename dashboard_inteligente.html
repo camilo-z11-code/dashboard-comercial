@@ -39,9 +39,21 @@ canvas{background:white;border-radius:10px;margin-top:20px;}
 
 <canvas id="supChart"></canvas>
 <canvas id="trendChart"></canvas>
+<canvas id="variacion"></canvas>
+function generarAlertas(){
+    let ul=document.getElementById("alertas");
+    ul.innerHTML="";
 
-<h2>🚨 Alertas</h2>
-<ul id="alertas"></ul>
+    asesores.forEach(a=>{
+        if(a.v < 20){
+            ul.innerHTML += `<li class="red">🚨 ${a.n} (CRÍTICO)</li>`;
+        } 
+        else if(a.v < 40){
+            ul.innerHTML += `<li class="yellow">⚠️ ${a.n} (BAJO)</li>`;
+        }
+    });
+}
+
 
 <h2>📋 Ranking</h2>
 <table>
@@ -168,7 +180,8 @@ graficos();
             v: parseInt(f.Ventas)
         }));
 
-        cargarTabla();
+cargarTabla();
+analisisGerencial();
     };
 
     reader.readAsArrayBuffer(file);
@@ -178,3 +191,42 @@ graficos();
 
 </body>
 </html>
+function analisisGerencial(){
+
+    let resumen = {};
+
+    asesores.forEach(a=>{
+        if(!resumen[a.s]){
+            resumen[a.s] = {total:0, count:0}
+        }
+        resumen[a.s].total += a.v;
+        resumen[a.s].count += 1;
+    });
+
+    let alertas = document.getElementById("alertas");
+    alertas.innerHTML = "";
+
+    for(let sup in resumen){
+        let prom = resumen[sup].total / resumen[sup].count;
+
+        if(prom < 30){
+            alertas.innerHTML += `<li class="red">🔴 ${sup} en estado CRÍTICO</li>`;
+        } 
+        else if(prom < 45){
+            alertas.innerHTML += `<li class="yellow">🟡 ${sup} en riesgo</li>`;
+        } 
+        else {
+            alertas.innerHTML += `<li class="green">🟢 ${sup} estable</li>`;
+        }
+    }
+}
+          new Chart(document.getElementById('variacion'),{
+    type:'bar',
+    data:{
+        labels:Object.keys(resumen),
+        datasets:[{
+            label:'Promedio por Supervisor',
+            data:Object.values(resumen).map(x=>Math.round(x.total/x.count))
+        }]
+    }
+});
