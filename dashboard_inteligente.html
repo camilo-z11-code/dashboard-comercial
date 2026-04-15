@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
+<head><script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
 <title>Dashboard Inteligente</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,7 +22,7 @@ canvas{background:white;border-radius:10px;margin-top:20px;}
 <body>
 
 <h1>📊 Dashboard Inteligente Comercial</h1>
-
+<input type="file" id="fileInput" accept=".xlsx" />
 <div class="container">
 <div class="card"><div>Ventas Marzo</div><div id="marzo">3459</div></div>
 <div class="card"><div>Proyección Abril</div><div id="abril">3747</div></div>
@@ -151,6 +151,28 @@ else est.innerHTML="<span class='red'>Crítico</span>";
 
 cargarTabla();
 graficos();
+  document.getElementById('fileInput').addEventListener('change', function(e) {
+    let file = e.target.files[0];
+    let reader = new FileReader();
+
+    reader.onload = function(e) {
+        let data = new Uint8Array(e.target.result);
+        let workbook = XLSX.read(data, {type: 'array'});
+
+        let hoja = workbook.Sheets[workbook.SheetNames[0]];
+        let json = XLSX.utils.sheet_to_json(hoja);
+
+        asesores = json.map(f => ({
+            n: f.Nombre,
+            s: f.Supervisor,
+            v: parseInt(f.Ventas)
+        }));
+
+        cargarTabla();
+    };
+
+    reader.readAsArrayBuffer(file);
+});
 
 </script>
 
